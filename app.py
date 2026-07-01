@@ -2,29 +2,22 @@
 app.py
 -------
 FastAPI backend — wires MahabharatamRetriever + generate_answer into
-HTTP endpoints consumed by the frontend (templates/index.html).
+HTTP endpoints consumed by the frontend (template/index.html).
 
 Endpoints:
   GET  /              -> serves the HTML UI
   POST /ask           -> non-streaming: returns full answer as JSON
-  POST /ask/stream    -> streaming: Server-Sent Events, tokens arrive
-                         word-by-word so the UI feels responsive
-
-Design decisions:
-- Retriever is a module-level singleton, initialised once at startup.
-  Loading BGE-M3 takes ~5s — doing it per-request would be unusable.
-- /ask/stream uses SSE (text/event-stream) which works with a plain
-  fetch() EventSource in vanilla JS — no websocket complexity needed.
-- CORS is open for localhost only — tighten this if you deploy publicly.
-- Request/response models are typed with Pydantic so FastAPI auto-generates
-  docs at /docs — useful while you're building the frontend.
+  POST /ask/stream    -> streaming SSE, tokens arrive word-by-word
+  GET  /health        -> liveness check
 
 Run:
   uvicorn app:app --reload --port 8000
+  Then open: http://localhost:8000
 """
 
 import os
 import json
+from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -41,48 +34,61 @@ from src.translate_text import generate_answer, detect_language, LANG_NAMES
 
 load_dotenv()
 
-# ---- config -------------------------------------------------------
+# ── Paths anchored to project root (works from any working directory) ──
+ROOT          = Path(__file__).resolve().parent
+STATIC_DIR    = ROOT / "static"
+TEMPLATE_DIR  = ROOT / "template"     # matches your actual folder name
+
+# ── Config ─────────────────────────────────────────────────────────
 TOP_K = 5
-# ---------------------------------------------------------------------
 
-
-# ── Singleton retriever, loaded once at startup ────────────────────
+# ── Singleton retriever ────────────────────────────────────────────
 retriever: MahabharatamRetriever | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Load the BGE-M3 model and open Chroma once when the server starts."""
+    """Load BGE-M3 model + open Chroma once at server startup."""
     global retriever
-    print("Loading retriever (BGE-M3 + Chroma)...")
+    print("\n🚀 Starting VyasaRAG...")
+    print("   Loading BGE-M3 + Chroma (this takes ~5s)...")
     retriever = MahabharatamRetriever()
-    print("Retriever ready.\n")
+    print("   ✅ Retriever ready.")
+    print("   🌐 Open http://localhost:8000\n")
     yield
-    # Nothing to clean up — Chroma PersistentClient closes automatically
 
 
 app = FastAPI(
-    title="Mahabharatam RAG API",
+    title="VyasaRAG",
     description="Multilingual Q&A over the Telugu Mahabharata",
+    version="1.0.0",
     lifespan=lifespan,
 )
 
+# CORS — open for all localhost ports (covers 8000, 3000, 5500 etc.)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000"],
-    allow_methods=["*"],
+    allow_origins=[
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5500",
+        "http://127.0.0.1:5500",
+    ],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 
 
-# ── Request / Response models ──────────────────────────────────────
+# ── Pydantic models ────────────────────────────────────────────────
 
 class AskRequest(BaseModel):
     query: str
-    chapter_filter: str | None = None   # optional: restrict to a chapter
+    chapter_filter: str | None = None
     top_k: int = TOP_K
 
 
@@ -105,6 +111,7 @@ class AskResponse(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
+    """Serve the main UI."""
     return templates.TemplateResponse("index.html", {"request": request})
 
 
@@ -112,13 +119,13 @@ async def index(request: Request):
 async def ask(req: AskRequest):
     """
     Non-streaming endpoint.
-    Returns the full answer + source chunks once generation is complete.
-    Use this for programmatic access or testing.
+    Returns the complete answer + source chunks as JSON.
+    Useful for programmatic access or API testing at /docs.
     """
     if not retriever:
-        raise HTTPException(status_code=503, detail="Retriever not ready")
+        raise HTTPException(status_code=503, detail="Retriever not initialised yet.")
     if not req.query.strip():
-        raise HTTPException(status_code=400, detail="Query cannot be empty")
+        raise HTTPException(status_code=400, detail="Query cannot be empty.")
 
     chunks = retriever.retrieve(
         query=req.query,
@@ -129,7 +136,7 @@ async def ask(req: AskRequest):
     if not chunks:
         raise HTTPException(
             status_code=404,
-            detail="No relevant passages found. Try rephrasing your question."
+            detail="No relevant passages found. Try rephrasing your question.",
         )
 
     answer = generate_answer(req.query, chunks, stream=False)
@@ -145,7 +152,7 @@ async def ask(req: AskRequest):
                 chapter_title=c.chapter_title,
                 pages=c.pages,
                 score=c.score,
-                text=c.text[:300],   # truncate for response size
+                text=c.text[:300],
             )
             for c in chunks
         ],
@@ -155,20 +162,18 @@ async def ask(req: AskRequest):
 @app.post("/ask/stream")
 async def ask_stream(req: AskRequest):
     """
-    Streaming endpoint using Server-Sent Events.
-    Sends three event types to the client:
-      - 'chunk'   : a token/partial text from the LLM
-      - 'sources' : JSON array of retrieved passages (sent after generation)
-      - 'done'    : signals the stream is complete
-      - 'error'   : if something went wrong
+    Streaming endpoint via Server-Sent Events (SSE).
 
-    The frontend listens with fetch() + ReadableStream (not EventSource,
-    because EventSource doesn't support POST) — see index.html.
+    Event types sent to the client:
+      event: chunk   -> one token/partial text from the LLM
+      event: sources -> JSON array of retrieved passages (sent after generation)
+      event: done    -> stream complete
+      event: error   -> something went wrong
     """
     if not retriever:
-        raise HTTPException(status_code=503, detail="Retriever not ready")
+        raise HTTPException(status_code=503, detail="Retriever not initialised yet.")
     if not req.query.strip():
-        raise HTTPException(status_code=400, detail="Query cannot be empty")
+        raise HTTPException(status_code=400, detail="Query cannot be empty.")
 
     chunks = retriever.retrieve(
         query=req.query,
@@ -181,21 +186,23 @@ async def ask_stream(req: AskRequest):
             yield "event: error\ndata: No relevant passages found.\n\n"
         return StreamingResponse(no_results(), media_type="text/event-stream")
 
-    sources_payload = json.dumps([
-        {
-            "chunk_id":      c.chunk_id,
-            "chapter_title": c.chapter_title,
-            "pages":         c.pages,
-            "score":         c.score,
-            "text":          c.text[:300],
-        }
-        for c in chunks
-    ], ensure_ascii=False)
+    sources_payload = json.dumps(
+        [
+            {
+                "chunk_id":      c.chunk_id,
+                "chapter_title": c.chapter_title,
+                "pages":         c.pages,
+                "score":         c.score,
+                "text":          c.text[:300],
+            }
+            for c in chunks
+        ],
+        ensure_ascii=False,
+    )
 
     async def event_generator():
         try:
             for token in generate_answer(req.query, chunks, stream=True):
-                # SSE format: "event: <type>\ndata: <payload>\n\n"
                 safe = token.replace("\n", " ")
                 yield f"event: chunk\ndata: {safe}\n\n"
 
@@ -209,17 +216,19 @@ async def ask_stream(req: AskRequest):
         event_generator(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",   # disable nginx buffering if deployed
+            "Cache-Control":      "no-cache",
+            "X-Accel-Buffering":  "no",
+            "Connection":         "keep-alive",
         },
     )
 
 
 @app.get("/health")
 async def health():
-    """Quick liveness check — useful for deployment."""
+    """Liveness check — visit http://localhost:8000/health to confirm server is up."""
     return {
-        "status": "ok",
+        "status":           "ok",
+        "project":          "VyasaRAG",
         "retriever_loaded": retriever is not None,
-        "vector_count": retriever.collection.count() if retriever else 0,
+        "vector_count":     retriever.collection.count() if retriever else 0,
     }

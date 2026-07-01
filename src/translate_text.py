@@ -40,8 +40,10 @@ Output: generated answer string (or stream of chunks)
 
 import os
 from groq import Groq
-from search import RetrievalResult, format_context_for_llm
-from search import MahabharatamRetriever
+try:
+       from search import RetrievalResult, format_context_for_llm, MahabharatamRetriever
+except ImportError:
+       from src.search import RetrievalResult, format_context_for_llm, MahabharatamRetriever
 from dotenv import load_dotenv
 
 load_dotenv()   # reads GROQ_API_KEY from .env
