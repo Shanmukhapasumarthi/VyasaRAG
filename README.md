@@ -68,25 +68,6 @@ mahabharatam-rag/
 
 ## Setup
 
-### Prerequisites
-
-**Python 3.10+** and **Tesseract OCR with Telugu language pack:**
-
-```bash
-# Ubuntu / Debian
-sudo apt-get install tesseract-ocr tesseract-ocr-tel
-
-# macOS
-brew install tesseract
-# then download Telugu data:
-wget https://raw.githubusercontent.com/tesseract-ocr/tessdata/main/tel.traineddata \
-     -O /usr/local/share/tessdata/tel.traineddata
-
-# Windows
-# Install Tesseract from: https://github.com/UB-Mannheim/tesseract/wiki
-# Download tel.traineddata into your Tesseract tessdata folder
-```
-
 ### Install Python dependencies
 
 ```bash
