@@ -159,7 +159,7 @@ curl -X POST http://localhost:8000/ask \
 
 ## How It Works — Step by Step
 
-### Why OCR instead of direct text extraction?
+### Why EASYOCR instead of direct text extraction?
 The source PDF is typeset in **Praveena** and **Priyaanka** — legacy non-Unicode Telugu DTP fonts from Modular Infotech. These fonts map Telugu glyphs onto Latin/ASCII codepoints for visual rendering. Direct extraction (PyMuPDF, pdfplumber) returns the raw codepoints — readable-looking garbage, not Telugu Unicode. OCR reads the rendered glyphs as pixels, producing proper Unicode Telugu regardless of the font encoding.
 
 ### Why no translation step?
