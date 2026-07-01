@@ -30,7 +30,7 @@ Final Answer (same language as query)
 
 | Component | Choice | Why |
 |---|---|---|
-| OCR | Tesseract (`tel`) | Source PDF uses legacy non-Unicode Telugu fonts (Praveena/Priyaanka) — direct text extraction returns garbled output |
+| EASYOCR | Tesseract (`tel`) | Source PDF uses legacy non-Unicode Telugu fonts (Praveena/Priyaanka) — direct text extraction returns garbled output |
 | Embedding | `BAAI/bge-m3` | Best-in-class cross-lingual dense retrieval, 100+ languages, 8192 token context |
 | Vector DB | Chroma (local, persistent) | Zero infra, free, metadata filtering built-in |
 | Chunking | Recursive semantic, ~500 tokens / 50 overlap | Preserves sentence boundaries; overlap prevents ideas split across chunk edges from being lost |
