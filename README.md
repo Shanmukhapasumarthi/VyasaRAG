@@ -30,7 +30,7 @@ Final Answer (same language as query)
 
 | Component | Choice | Why |
 |---|---|---|
-| OCR | Tesseract (`tel`) | Source PDF uses legacy non-Unicode Telugu fonts (Praveena/Priyaanka) — direct text extraction returns garbled output |
+| EASYOCR | Tesseract (`tel`) | Source PDF uses legacy non-Unicode Telugu fonts (Praveena/Priyaanka) — direct text extraction returns garbled output |
 | Embedding | `BAAI/bge-m3` | Best-in-class cross-lingual dense retrieval, 100+ languages, 8192 token context |
 | Vector DB | Chroma (local, persistent) | Zero infra, free, metadata filtering built-in |
 | Chunking | Recursive semantic, ~500 tokens / 50 overlap | Preserves sentence boundaries; overlap prevents ideas split across chunk edges from being lost |
@@ -67,25 +67,6 @@ mahabharatam-rag/
 ---
 
 ## Setup
-
-### Prerequisites
-
-**Python 3.10+** and **Tesseract OCR with Telugu language pack:**
-
-```bash
-# Ubuntu / Debian
-sudo apt-get install tesseract-ocr tesseract-ocr-tel
-
-# macOS
-brew install tesseract
-# then download Telugu data:
-wget https://raw.githubusercontent.com/tesseract-ocr/tessdata/main/tel.traineddata \
-     -O /usr/local/share/tessdata/tel.traineddata
-
-# Windows
-# Install Tesseract from: https://github.com/UB-Mannheim/tesseract/wiki
-# Download tel.traineddata into your Tesseract tessdata folder
-```
 
 ### Install Python dependencies
 
@@ -178,7 +159,7 @@ curl -X POST http://localhost:8000/ask \
 
 ## How It Works — Step by Step
 
-### Why OCR instead of direct text extraction?
+### Why EASYOCR instead of direct text extraction?
 The source PDF is typeset in **Praveena** and **Priyaanka** — legacy non-Unicode Telugu DTP fonts from Modular Infotech. These fonts map Telugu glyphs onto Latin/ASCII codepoints for visual rendering. Direct extraction (PyMuPDF, pdfplumber) returns the raw codepoints — readable-looking garbage, not Telugu Unicode. OCR reads the rendered glyphs as pixels, producing proper Unicode Telugu regardless of the font encoding.
 
 ### Why no translation step?
@@ -191,7 +172,7 @@ Telugu is low-resource in most open LLMs' training data. The quality gap between
 
 ## Known Limitations
 
-- **Chapter number OCR errors:** Tesseract occasionally misreads Telugu numerals (e.g., `3` → `8`). Chapter *titles* are reliable; chapter *numbers* may need a manual correction pass. This affects citation display only, not retrieval quality.
+- **EasyOCR** grabs words from images, but it doesn't understand the meaning of the document. It treats a page like a flat picture, not a smart form.
 - **Front matter exclusion:** Pages 0–17 (title, TOC, translator's foreword) are excluded from the index. Verify `CONTENT_START_PAGE = 18` in `clean_text.py` matches your specific edition.
 - **Telugu generation quality:** Llama-3.1-70B handles Telugu well but is not a native-Telugu model. Answers in Telugu are fluent for most questions but may have minor grammatical imperfections.
 - **CPU embedding time:** Generating BGE-M3 embeddings for ~2000 chunks takes 1-2 hours on CPU. Consider using a machine with a GPU for the embedding step.
@@ -203,7 +184,6 @@ Telugu is low-resource in most open LLMs' training data. The quality gap between
 - [ ] Cross-encoder reranker on top-k results before LLM context (improves precision)
 - [ ] Chapter number correction lookup table (title → correct number)
 - [ ] Streaming to mobile-friendly UI
-- [ ] Docker container for one-command setup
 - [ ] Evaluation set: 20–30 hand-written Telugu QA pairs for systematic quality measurement
 
 ---
