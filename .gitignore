@@ -1,0 +1,26 @@
+# Environment
+.env
+
+# Data pipeline outputs — large files, regenerate from PDF
+data/mahabharatam_ocr.jsonl
+data/mahabharatam_clean.jsonl
+data/mahabharatam_chunks.jsonl
+data/mahabharatam_embeddings.jsonl
+data/chroma_db/
+
+# But keep the data folder itself
+!data/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# HuggingFace model cache (large, downloaded automatically)
+~/.cache/huggingface/
+
+# OS
+.DS_Store
+Thumbs.db

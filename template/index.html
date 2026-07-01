@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="te">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>మహాభారతం — బహుభాషా సంప్రదింపు</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Tiro+Telugu:ital@0;1&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <div class="title-block">
+        <span class="sanskrit">మహాభారతం</span>
+        <span class="subtitle">Ask in any language · Answered from the source</span>
+      </div>
+      <div class="lang-hint">Telugu · English · Hindi · and more</div>
+    </div>
+  </header>
+
+  <main>
+    <section class="query-section">
+      <div class="input-row">
+        <textarea
+          id="queryInput"
+          placeholder="Ask a question about the Mahabharata…&#10;ఉదా: భీష్ముడు ఎవరు? / Who is Draupadi? / भीम ने क्या किया?"
+          rows="3"
+          autofocus
+        ></textarea>
+        <div class="input-controls">
+          <div class="chapter-filter-wrap">
+            <label for="chapterFilter">Filter by chapter (optional)</label>
+            <input
+              id="chapterFilter"
+              type="text"
+              placeholder="e.g. భీష్మ or Karna"
+            />
+          </div>
+          <button id="askBtn" onclick="askQuestion()">
+            <span id="btnText">Ask</span>
+            <span id="btnSpinner" class="spinner hidden"></span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="answer-section hidden" id="answerSection">
+      <div class="answer-header">
+        <span class="answer-label">Answer</span>
+        <span class="detected-lang" id="detectedLang"></span>
+      </div>
+      <div class="answer-body" id="answerBody"></div>
+    </section>
+
+    <section class="sources-section hidden" id="sourcesSection">
+      <h3 class="sources-heading">Source passages</h3>
+      <div class="sources-list" id="sourcesList"></div>
+    </section>
+
+    <div class="error-banner hidden" id="errorBanner"></div>
+  </main>
+
+  <footer>
+    <span>Source: Telugu Mahabharatam · Prajasakti Book House</span>
+  </footer>
+
+<script>
+  const queryInput   = document.getElementById("queryInput");
+  const askBtn       = document.getElementById("askBtn");
+  const btnText      = document.getElementById("btnText");
+  const btnSpinner   = document.getElementById("btnSpinner");
+  const answerSection = document.getElementById("answerSection");
+  const answerBody   = document.getElementById("answerBody");
+  const detectedLang = document.getElementById("detectedLang");
+  const sourcesSection = document.getElementById("sourcesSection");
+  const sourcesList  = document.getElementById("sourcesList");
+  const errorBanner  = document.getElementById("errorBanner");
+
+  // Allow Ctrl+Enter / Cmd+Enter to submit
+  queryInput.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") askQuestion();
+  });
+
+  function setLoading(on) {
+    askBtn.disabled = on;
+    btnText.classList.toggle("hidden", on);
+    btnSpinner.classList.toggle("hidden", !on);
+  }
+
+  function showError(msg) {
+    errorBanner.textContent = msg;
+    errorBanner.classList.remove("hidden");
+    setTimeout(() => errorBanner.classList.add("hidden"), 6000);
+  }
+
+  function renderSources(sources) {
+    sourcesList.innerHTML = "";
+    sources.forEach((s, i) => {
+      const div = document.createElement("div");
+      div.className = "source-card";
+      const pages = s.pages.length ? `pp. ${s.pages.join(", ")}` : "";
+      const score = Math.round(s.score * 100);
+      div.innerHTML = `
+        <div class="source-meta">
+          <span class="source-chapter">${s.chapter_title || "Prologue"}</span>
+          <span class="source-detail">${pages}</span>
+          <span class="source-score">${score}% match</span>
+        </div>
+        <div class="source-text">${s.text}</div>
+      `;
+      sourcesList.appendChild(div);
+    });
+    sourcesSection.classList.remove("hidden");
+  }
+
+  async function askQuestion() {
+    const query = queryInput.value.trim();
+    if (!query) { showError("Please enter a question."); return; }
+
+    const chapterFilter = document.getElementById("chapterFilter").value.trim() || null;
+
+    // Reset UI
+    setLoading(true);
+    errorBanner.classList.add("hidden");
+    answerBody.textContent = "";
+    detectedLang.textContent = "";
+    answerSection.classList.remove("hidden");
+    sourcesSection.classList.add("hidden");
+    sourcesList.innerHTML = "";
+
+    try {
+      const response = await fetch("/ask/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, chapter_filter: chapterFilter, top_k: 5 }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        showError(err.detail || "Server error.");
+        setLoading(false);
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop();   // keep incomplete line for next iteration
+
+        let eventType = null;
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            eventType = line.slice(7).trim();
+          } else if (line.startsWith("data: ")) {
+            const data = line.slice(6);
+            if (eventType === "chunk") {
+              answerBody.textContent += data;
+            } else if (eventType === "sources") {
+              const sources = JSON.parse(data);
+              renderSources(sources);
+              // Detect language from first chunk's context (server sends it in sources)
+            } else if (eventType === "error") {
+              showError(data);
+            } else if (eventType === "done") {
+              setLoading(false);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      showError("Connection error: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+</script>
+</body>
+</html>
