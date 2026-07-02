@@ -12,7 +12,7 @@ Endpoints:
 
 Run:
   uvicorn app:app --reload --port 8000
-  Then open: http://localhost:8000
+  Then open: http://localhost:8000 or http://127.0.0.1:8000
 """
 
 import os
@@ -112,7 +112,7 @@ class AskResponse(BaseModel):
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Serve the main UI."""
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html", {})
 
 
 @app.post("/ask", response_model=AskResponse)
@@ -232,3 +232,7 @@ async def health():
         "retriever_loaded": retriever is not None,
         "vector_count":     retriever.collection.count() if retriever else 0,
     }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
