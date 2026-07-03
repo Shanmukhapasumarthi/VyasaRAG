@@ -28,6 +28,10 @@ Language detection:
   We detect the query language automatically so the prompt can explicitly
   instruct the LLM to answer in that language. This handles the cross-lingual
   flow without requiring the user to specify their language manually.
+  NOTE: if the user's query explicitly requests a different output language
+  (e.g. "explain this in German"), build_prompt() instructs the LLM to
+  honor that explicit request over the auto-detected language — see
+  INSTRUCTIONS point 3 below.
 
 Streaming:
   Groq supports streaming — we expose both a streaming and non-streaming
@@ -41,9 +45,9 @@ Output: generated answer string (or stream of chunks)
 import os
 from groq import Groq
 try:
-       from search import RetrievalResult, format_context_for_llm, MahabharatamRetriever
+    from search import RetrievalResult, format_context_for_llm, MahabharatamRetriever
 except ImportError:
-       from src.search import RetrievalResult, format_context_for_llm, MahabharatamRetriever
+    from src.search import RetrievalResult, format_context_for_llm, MahabharatamRetriever
 from dotenv import load_dotenv
 
 load_dotenv()   # reads GROQ_API_KEY from .env
@@ -94,7 +98,8 @@ def build_prompt(
     Build the RAG prompt that instructs the LLM to:
     - Read the Telugu source chunks
     - Synthesise an answer grounded ONLY in those chunks
-    - Write the answer in the user's language
+    - Write the answer in the user's detected language, UNLESS the query
+      itself explicitly asks for a different output language
     """
     answer_lang = LANG_NAMES.get(query_lang_code, "the same language as the question")
 
@@ -112,12 +117,12 @@ USER QUESTION: {query}
 INSTRUCTIONS:
 1. Read and understand the Telugu passages above carefully.
 2. Answer the user's question based ONLY on the information in those passages.
-3. Write your answer in {answer_lang}.
-4. If the passages do not contain enough information to answer the question, say so clearly in {answer_lang} — do not guess or use outside knowledge.
+3. Write your answer in {answer_lang}, UNLESS the user's question explicitly requests a different output language (e.g. "explain this in German" or "answer in French") — in that case, write the answer in the explicitly requested language instead.
+4. If the passages do not contain enough information to answer the question, say so clearly — do not guess or use outside knowledge.
 5. When relevant, mention which chapter the information comes from.
 6. Keep the answer concise and accurate.
 
-ANSWER (in {answer_lang}):"""
+ANSWER:"""
 
 
 def generate_answer(

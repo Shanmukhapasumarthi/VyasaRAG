@@ -31,10 +31,10 @@ Final Answer (same language as query)
 | Component | Choice | Why |
 |---|---|---|
 | EASYOCR | Tesseract (`tel`) | Source PDF uses legacy non-Unicode Telugu fonts (Praveena/Priyaanka) — direct text extraction returns garbled output |
-| Embedding | `BAAI/bge-m3` | Best-in-class cross-lingual dense retrieval, 100+ languages, 8192 token context |
+| Embedding | `BAAI/bge-m3` | Best-in-class cross-lingual dense retrieval, 10+ languages, 8192 token context |
 | Vector DB | Chroma (local, persistent) | Zero infra, free, metadata filtering built-in |
 | Chunking | Recursive semantic, ~500 tokens / 50 overlap | Preserves sentence boundaries; overlap prevents ideas split across chunk edges from being lost |
-| LLM | Groq `llama-3.1-70b-versatile` | Strong multilingual generation; 70B noticeably better than 8B for low-resource Telugu output |
+| LLM | Groq `openai/gpt-oss-120b` | Strong multilingual generation; 70B noticeably better than 8B for low-resource Telugu output |
 | Backend | FastAPI + SSE streaming | Tokens stream to the frontend word-by-word — no long waits |
 | Frontend | Vanilla JS + Jinja2 | No build step, no framework overhead |
 
