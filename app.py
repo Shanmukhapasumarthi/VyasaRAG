@@ -50,11 +50,11 @@ retriever: MahabharatamRetriever | None = None
 async def lifespan(app: FastAPI):
     """Load BGE-M3 model + open Chroma once at server startup."""
     global retriever
-    print("\n🚀 Starting VyasaRAG...")
-    print("   Loading BGE-M3 + Chroma (this takes ~5s)...")
+    print("Starting VyasaRAG...")
+    print("Loading BGE-M3 + Chroma (this takes ~5s)...")
     retriever = MahabharatamRetriever()
-    print("   ✅ Retriever ready.")
-    print("   🌐 Open http://localhost:8000\n")
+    print("Retriever ready.")
+    print("Open http://localhost:8000\n")
     yield
 
 
@@ -105,7 +105,8 @@ class AskResponse(BaseModel):
     detected_language: str
     answer: str
     sources: list[SourceChunk]
-
+    source_chapters: list[str]          # deduplicated list of chapters retrieved from
+    sources: list[SourceChunk]
 
 # ── Routes ─────────────────────────────────────────────────────────
 
