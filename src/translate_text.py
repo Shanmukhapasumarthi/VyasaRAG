@@ -141,6 +141,7 @@ def build_prompt(
     query: str,
     context: str,
     query_lang_code: str,
+    history: str | None = None,
 ) -> str:
     """
     Build the RAG prompt that instructs the LLM to:
@@ -150,7 +151,13 @@ def build_prompt(
       itself explicitly asks for a different output language
     """
     answer_lang = LANG_NAMES.get(query_lang_code, "the same language as the question")
-
+    history_block = ""
+    if history:
+        history_block = f"""
+--- CONVERSATION SO FAR (for context only — do not re-answer these turns) ---
+{history}
+--- END OF CONVERSATION HISTORY ---
+"""
     return f"""You are a knowledgeable assistant helping users understand the Telugu Mahabharata.
 
 The following passages are excerpts from the Telugu Mahabharata, retrieved based on the user's question.
@@ -177,6 +184,7 @@ def generate_answer(
     query: str,
     retrieved_chunks: list[RetrievalResult],
     stream: bool = False,
+    history: str | None = None,
 ):
     
     client  = Groq(api_key=os.environ["GROQ_API_KEY"])

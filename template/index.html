@@ -5,89 +5,134 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>మహాభారతం — బహుభాషా సంప్రదింపు</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Tiro+Telugu:ital@0;1&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Tiro+Telugu:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
 
-  <header>
-    <div class="header-inner">
-      <div class="title-block">
-        <span class="sanskrit">మహాభారతం</span>
-        <span class="subtitle">Ask in any language · Answered from the source</span>
-      </div>
-      <div class="lang-hint">Telugu · English · Hindi · and more</div>
-    </div>
-  </header>
+  <div class="app" id="app">
 
-  <main>
-    <section class="query-section">
-      <div class="input-row">
-        <textarea
-          id="queryInput"
-          placeholder="Ask a question about the Mahabharata…&#10;ఉదా: భీష్ముడు ఎవరు? / Who is Draupadi? / भीम ने क्या किया?"
-          rows="3"
-          autofocus
-        ></textarea>
-        <div class="input-controls">
-          <div class="chapter-filter-wrap">
-            <label for="chapterFilter">Filter by chapter (optional)</label>
-            <input
-              id="chapterFilter"
-              type="text"
-              placeholder="e.g. భీష్మ or Karna"
-            />
+    <!-- ── Sidebar ─────────────────────────────────────────────── -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-top">
+        <span class="brand"><span class="brand-mark">మ</span> VyasaRAG</span>
+        <button class="icon-btn" id="collapseSidebarBtn" title="Collapse sidebar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 4L7 12L15 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+
+      <button class="new-chat-btn" id="newChatBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        New conversation
+      </button>
+
+      <div class="sidebar-section-label">Recent</div>
+      <nav class="conversation-list" id="conversationList">
+        <!-- populated by JS -->
+      </nav>
+
+      <div class="sidebar-bottom">Prajasakti Book House</div>
+    </aside>
+
+    <!-- Floating reopen button, shown only when sidebar is collapsed -->
+    <button class="icon-btn expand-sidebar-btn hidden" id="expandSidebarBtn" title="Open sidebar">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 4L17 12L9 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+
+    <!-- ── Main chat pane ──────────────────────────────────────── -->
+    <div class="main">
+      <header class="topbar">
+        <span class="topbar-title" id="headerTitle">New conversation</span>
+        <div class="chapter-filter-wrap">
+          <input id="chapterFilter" type="text" placeholder="Filter by chapter (optional) — e.g. భీష్మ or Karna" />
+        </div>
+      </header>
+
+      <div class="chat-scroll" id="messages">
+        <div class="empty-state" id="emptyState">
+          <span class="sanskrit">మహాభారతం</span>
+          <p class="empty-lede">Ask a question about the Mahabharata, in any language.</p>
+          <p class="empty-sub">Follow up naturally — I'll remember the conversation.</p>
+          <div class="empty-examples">
+            <button class="example-chip" data-example="భీష్ముడు ఎవరు?">భీష్ముడు ఎవరు?</button>
+            <button class="example-chip" data-example="Who is Draupadi?">Who is Draupadi?</button>
+            <button class="example-chip" data-example="भीम ने क्या किया?">भीम ने क्या किया?</button>
           </div>
-          <button id="askBtn" onclick="askQuestion()">
-            <span id="btnText">Ask</span>
-            <span id="btnSpinner" class="spinner hidden"></span>
-          </button>
         </div>
       </div>
-    </section>
 
-    <section class="answer-section hidden" id="answerSection">
-      <div class="answer-header">
-        <span class="answer-label">Answer</span>
-        <span class="detected-lang" id="detectedLang"></span>
+      <div class="composer-area">
+        <div class="error-banner hidden" id="errorBanner"></div>
+        <div class="composer">
+          <textarea
+            id="queryInput"
+            placeholder="Ask a question, or ask a follow-up…"
+            rows="1"
+            autofocus
+          ></textarea>
+          <button id="askBtn" title="Send">
+            <span id="btnSpinner" class="spinner hidden"></span>
+            <svg id="sendIcon" width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+        <div class="composer-hint">Enter to send · Shift+Enter for a new line</div>
       </div>
-      <div class="answer-body" id="answerBody"></div>
-    </section>
-
-    <section class="sources-section hidden" id="sourcesSection">
-      <h3 class="sources-heading">Source passages</h3>
-      <div class="sources-list" id="sourcesList"></div>
-    </section>
-
-    <div class="error-banner hidden" id="errorBanner"></div>
-  </main>
-
-  <footer>
-    <span>Source: Telugu Mahabharatam · Prajasakti Book House</span>
-  </footer>
+    </div>
+  </div>
 
 <script>
-  const queryInput   = document.getElementById("queryInput");
-  const askBtn       = document.getElementById("askBtn");
-  const btnText      = document.getElementById("btnText");
-  const btnSpinner   = document.getElementById("btnSpinner");
-  const answerSection = document.getElementById("answerSection");
-  const answerBody   = document.getElementById("answerBody");
-  const detectedLang = document.getElementById("detectedLang");
-  const sourcesSection = document.getElementById("sourcesSection");
-  const sourcesList  = document.getElementById("sourcesList");
-  const errorBanner  = document.getElementById("errorBanner");
+  // ── Element refs ───────────────────────────────────────────────
+  const appEl               = document.getElementById("app");
+  const collapseSidebarBtn  = document.getElementById("collapseSidebarBtn");
+  const expandSidebarBtn    = document.getElementById("expandSidebarBtn");
+  const newChatBtn          = document.getElementById("newChatBtn");
+  const conversationList    = document.getElementById("conversationList");
+  const headerTitle         = document.getElementById("headerTitle");
+  const messagesEl          = document.getElementById("messages");
+  const emptyState          = document.getElementById("emptyState");
+  const errorBanner         = document.getElementById("errorBanner");
+  const queryInput          = document.getElementById("queryInput");
+  const askBtn              = document.getElementById("askBtn");
+  const sendIcon            = document.getElementById("sendIcon");
+  const btnSpinner          = document.getElementById("btnSpinner");
+  const chapterFilterInput  = document.getElementById("chapterFilter");
 
-  // Allow Ctrl+Enter / Cmd+Enter to submit
-  queryInput.addEventListener("keydown", (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") askQuestion();
+  // ── State ──────────────────────────────────────────────────────
+  let currentConversationId = null;   // null => next message starts a new conversation
+  let isStreaming = false;
+
+  // ── Sidebar collapse ───────────────────────────────────────────
+  collapseSidebarBtn.addEventListener("click", () => {
+    appEl.classList.add("sidebar-collapsed");
+    expandSidebarBtn.classList.remove("hidden");
+  });
+  expandSidebarBtn.addEventListener("click", () => {
+    appEl.classList.remove("sidebar-collapsed");
+    expandSidebarBtn.classList.add("hidden");
   });
 
-  function setLoading(on) {
-    askBtn.disabled = on;
-    btnText.classList.toggle("hidden", on);
-    btnSpinner.classList.toggle("hidden", !on);
-  }
+  // ── Example chips ──────────────────────────────────────────────
+  document.querySelectorAll(".example-chip").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      queryInput.value = btn.dataset.example;
+      queryInput.dispatchEvent(new Event("input"));
+      askQuestion();
+    });
+  });
+
+  // ── Auto-grow textarea ─────────────────────────────────────────
+  queryInput.addEventListener("input", () => {
+    queryInput.style.height = "auto";
+    queryInput.style.height = Math.min(queryInput.scrollHeight, 200) + "px";
+  });
+  queryInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      askQuestion();
+    }
+  });
+  askBtn.addEventListener("click", askQuestion);
+  newChatBtn.addEventListener("click", startNewChat);
 
   function showError(msg) {
     errorBanner.textContent = msg;
@@ -95,13 +140,62 @@
     setTimeout(() => errorBanner.classList.add("hidden"), 6000);
   }
 
-  function renderSources(sources) {
-    sourcesList.innerHTML = "";
-    sources.forEach((s, i) => {
+  function setLoading(on) {
+    isStreaming = on;
+    askBtn.disabled = on;
+    sendIcon.classList.toggle("hidden", on);
+    btnSpinner.classList.toggle("hidden", !on);
+  }
+
+  function scrollToBottom() {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function clearEmptyState() {
+    if (emptyState.parentNode) emptyState.remove();
+  }
+
+  // ── Rendering ──────────────────────────────────────────────────
+  function renderUserBubble(text) {
+    clearEmptyState();
+    const row = document.createElement("div");
+    row.className = "msg-row user";
+    row.innerHTML = `<div class="msg-bubble user-bubble"></div>`;
+    row.querySelector(".msg-bubble").textContent = text;
+    messagesEl.appendChild(row);
+    scrollToBottom();
+  }
+
+  function renderAssistantBubble() {
+    clearEmptyState();
+    const row = document.createElement("div");
+    row.className = "msg-row assistant";
+    row.innerHTML = `
+      <div class="assistant-avatar">మ</div>
+      <div class="assistant-content">
+        <div class="assistant-text"></div>
+        <div class="sources-list hidden"></div>
+      </div>`;
+    messagesEl.appendChild(row);
+    scrollToBottom();
+    return {
+      textEl: row.querySelector(".assistant-text"),
+      sourcesEl: row.querySelector(".sources-list"),
+    };
+  }
+
+  function renderSourcesInto(sourcesEl, sources) {
+    sourcesEl.innerHTML = "";
+    if (!sources.length) { sourcesEl.classList.add("hidden"); return; }
+    const label = document.createElement("div");
+    label.className = "sources-label";
+    label.textContent = `Sources (${sources.length})`;
+    sourcesEl.appendChild(label);
+    sources.forEach((s) => {
       const div = document.createElement("div");
       div.className = "source-card";
-      const pages = s.pages.length ? `pp. ${s.pages.join(", ")}` : "";
-      const score = Math.round(s.score * 100);
+      const pages = (s.pages && s.pages.length) ? `pp. ${s.pages.join(", ")}` : "";
+      const score = Math.round((s.score || 0) * 100);
       div.innerHTML = `
         <div class="source-meta">
           <span class="source-chapter">${s.chapter_title || "Prologue"}</span>
@@ -110,31 +204,127 @@
         </div>
         <div class="source-text">${s.text}</div>
       `;
-      sourcesList.appendChild(div);
+      sourcesEl.appendChild(div);
     });
-    sourcesSection.classList.remove("hidden");
+    sourcesEl.classList.remove("hidden");
   }
 
+  function renderHistory(conversation) {
+    messagesEl.innerHTML = "";
+    (conversation.messages || []).forEach((m) => {
+      if (m.role === "user") {
+        renderUserBubble(m.content);
+      } else {
+        const refs = renderAssistantBubble();
+        refs.textEl.textContent = m.content;
+        if (m.sources && m.sources.length) {
+          renderSourcesInto(refs.sourcesEl, m.sources);
+        }
+      }
+    });
+    if (!conversation.messages || !conversation.messages.length) {
+      messagesEl.appendChild(emptyState);
+    }
+    scrollToBottom();
+  }
+
+  // ── Sidebar: conversation list ─────────────────────────────────
+  async function loadConversationList() {
+    try {
+      const res = await fetch("/conversations");
+      if (!res.ok) return;
+      const convos = await res.json();
+      conversationList.innerHTML = "";
+      if (!convos.length) {
+        const empty = document.createElement("div");
+        empty.className = "convo-list-empty";
+        empty.textContent = "No conversations yet";
+        conversationList.appendChild(empty);
+        return;
+      }
+      convos.forEach((c) => {
+        const item = document.createElement("div");
+        item.className = "convo-item" + (c.id === currentConversationId ? " active" : "");
+        item.dataset.id = c.id;
+        item.innerHTML = `
+          <span class="convo-title">${c.title || "Untitled"}</span>
+          <button class="convo-delete" title="Delete conversation">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6L18 18M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>
+        `;
+        item.querySelector(".convo-title").addEventListener("click", () => openConversation(c.id));
+        item.querySelector(".convo-delete").addEventListener("click", (e) => {
+          e.stopPropagation();
+          deleteConversation(c.id);
+        });
+        conversationList.appendChild(item);
+      });
+    } catch (err) {
+      console.error("Failed to load conversations:", err);
+    }
+  }
+
+  async function openConversation(id) {
+    if (isStreaming) return;
+    try {
+      const res = await fetch(`/conversations/${id}`);
+      if (!res.ok) { showError("Could not load that conversation."); return; }
+      const convo = await res.json();
+      currentConversationId = convo.id;
+      headerTitle.textContent = convo.title || "Conversation";
+      renderHistory(convo);
+      await loadConversationList();
+    } catch (err) {
+      showError("Connection error: " + err.message);
+    }
+  }
+
+  async function deleteConversation(id) {
+    try {
+      await fetch(`/conversations/${id}`, { method: "DELETE" });
+      if (id === currentConversationId) startNewChat();
+      await loadConversationList();
+    } catch (err) {
+      showError("Could not delete conversation.");
+    }
+  }
+
+  function startNewChat() {
+    if (isStreaming) return;
+    currentConversationId = null;
+    headerTitle.textContent = "New conversation";
+    messagesEl.innerHTML = "";
+    messagesEl.appendChild(emptyState);
+    queryInput.focus();
+    loadConversationList();
+  }
+
+  // ── Ask ────────────────────────────────────────────────────────
   async function askQuestion() {
+    if (isStreaming) return;
     const query = queryInput.value.trim();
-    if (!query) { showError("Please enter a question."); return; }
+    if (!query) return;
 
-    const chapterFilter = document.getElementById("chapterFilter").value.trim() || null;
+    const chapterFilter = chapterFilterInput.value.trim() || null;
 
-    // Reset UI
-    setLoading(true);
+    renderUserBubble(query);
+    queryInput.value = "";
+    queryInput.style.height = "auto";
     errorBanner.classList.add("hidden");
-    answerBody.textContent = "";
-    detectedLang.textContent = "";
-    answerSection.classList.remove("hidden");
-    sourcesSection.classList.add("hidden");
-    sourcesList.innerHTML = "";
+    setLoading(true);
+
+    const refs = renderAssistantBubble();
 
     try {
       const response = await fetch("/ask/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, chapter_filter: chapterFilter, top_k: 5 }),
+        body: JSON.stringify({
+          query,
+          chapter_filter: chapterFilter,
+          top_k: 5,
+          conversation_id: currentConversationId,
+        }),
       });
 
       if (!response.ok) {
@@ -154,7 +344,7 @@
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
-        buffer = lines.pop();   // keep incomplete line for next iteration
+        buffer = lines.pop();
 
         let eventType = null;
         for (const line of lines) {
@@ -162,16 +352,28 @@
             eventType = line.slice(7).trim();
           } else if (line.startsWith("data: ")) {
             const data = line.slice(6);
-            if (eventType === "chunk") {
-              answerBody.textContent += data;
+            if (eventType === "meta") {
+              const meta = JSON.parse(data);
+              if (meta.conversation_id) {
+                const isFirstMessage = currentConversationId === null;
+                currentConversationId = meta.conversation_id;
+                if (isFirstMessage) {
+                  headerTitle.textContent = query.slice(0, 60);
+                  loadConversationList();
+                }
+              }
+            } else if (eventType === "chunk") {
+              refs.textEl.textContent += data;
+              scrollToBottom();
             } else if (eventType === "sources") {
               const sources = JSON.parse(data);
-              renderSources(sources);
-              // Detect language from first chunk's context (server sends it in sources)
+              renderSourcesInto(refs.sourcesEl, sources);
+              scrollToBottom();
             } else if (eventType === "error") {
               showError(data);
             } else if (eventType === "done") {
               setLoading(false);
+              loadConversationList();
             }
           }
         }
@@ -182,6 +384,9 @@
       setLoading(false);
     }
   }
+
+  // ── Init ───────────────────────────────────────────────────────
+  loadConversationList();
 </script>
 </body>
 </html>
