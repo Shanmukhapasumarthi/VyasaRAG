@@ -1,36 +1,3 @@
-"""
-clean_text.py
---------------
-Cleans raw OCR output (from data_loader.py) before chunking.
-
-What this handles, based on actually inspecting the OCR'd pages:
-
-1. FRONT MATTER EXCLUSION
-   Pages 0-~17 are title page / publisher's mission statement / table of
-   contents / translator's foreword ("మా మాట") — not Mahabharata narrative.
-   Indexing these would let queries retrieve publisher boilerplate instead
-   of story content. We skip everything before CONTENT_START_PAGE.
-   IMPORTANT: verify this page number yourself once you've run full OCR —
-   18 was found by spot-checking, not exhaustively confirmed for this edition.
-
-2. RUNNING FOOTER REMOVAL
-   Every narrative page ends with a footer like "మహాభారతం ళ్‌ 9]" or
-   "మహాభారతం కో | 10]" — the book title + OCR-garbled decorative symbol +
-   page number. We strip the last line of each page if it matches this
-   pattern (contains "మహాభారతం" near the end of the text).
-
-3. CHAPTER METADATA TAGGING
-   Chapter headings appear as "అధ్యాయం - N" followed by the chapter title
-   on the next line. We detect these and tag every subsequent chunk with
-   the current chapter number/title until the next heading is found — this
-   becomes retrieval metadata (so answers can cite "Chapter 20: Jarasandha
-   Vadha" instead of just a raw page number).
-
-Input:  the JSONL from data_loader.py  -> {"page": N, "text": "..."}
-Output: a new JSONL, one record per page, with chapter context attached:
-        {"page": N, "chapter_num": 20, "chapter_title": "జరాసంధ వధ", "text": "..."}
-"""
-
 import json
 import re
 from pathlib import Path

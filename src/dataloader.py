@@ -1,25 +1,3 @@
-"""
-data_loader.py
-----------------
-Extracts Telugu text from the Mahabharatam PDF via OCR (EasyOCR).
-
-Why OCR and not direct text extraction:
-The source PDF is typeset in legacy non-Unicode Telugu fonts (Praveena,
-Priyaanka — Modular Infotech family). Direct text extraction (PyMuPDF,
-pdfplumber, PyPDF2) pulls out the raw character codes, which are garbage —
-the fonts remap Telugu glyphs onto arbitrary Latin codepoints purely for
-*visual rendering*. OCR sidesteps this entirely by reading the rendered
-glyphs as pixels, independent of the underlying (broken) character codes.
-
-Output: a JSONL file, one JSON object per line:
-    {"page": 5, "text": "..."}
-
-JSONL (not a single JSON array) so that:
-  - progress is saved incrementally — a crash/interrupt mid-run doesn't
-    lose everything
-  - reruns can skip already-processed pages (checkpointing)
-"""
-
 import json
 import time
 from pathlib import Path
@@ -31,7 +9,7 @@ from PIL import Image
 import io
 
 # ---- config ----------------------------------------------------------
-PDF_PATH = "../data/MAHABHARATAM.pdf"
+PDF_PATH = "data/MAHABHARATAM.pdf"
 OUTPUT_PATH = "data/mahabharatam_ocr.jsonl"
 DPI = 300
 LANG = ["te"]            # EasyOCR uses "te" for Telugu (not "tel")

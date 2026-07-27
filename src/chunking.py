@@ -1,37 +1,3 @@
-"""
-chunking.py
-------------
-Recursive semantic chunking on the cleaned, chapter-tagged OCR output
-from clean_text.py.
-
-Approach:
-1. Group pages by chapter (consecutive pages sharing the same chapter_num
-   are concatenated into one continuous text blob first). This matters
-   because OCR'd text per page can end mid-sentence purely due to where
-   the PDF page happened to break — chunking page-by-page would bake that
-   artificial break into your chunks. Chunking at the chapter level avoids
-   that.
-2. Recursively split each chapter's text on a hierarchy of separators
-   (paragraph -> sentence -> word), so chunks break at natural semantic
-   boundaries wherever possible instead of at an arbitrary character count.
-3. Greedily merge the resulting pieces into ~MAX_TOKENS-sized chunks, with
-   OVERLAP_TOKENS of trailing context carried into the next chunk (so a
-   sentence/idea split across a chunk boundary isn't completely lost to
-   retrieval).
-4. Each chunk keeps chapter_num, chapter_title, and the source page range
-   it was drawn from, as metadata for later citation in answers.
-
-Token counts use the actual BGE-M3 tokenizer (same one used in embedding.py)
-so chunk sizing matches what the embedding model will actually see — not an
-approximation. First run will download the tokenizer from Hugging Face
-(needs internet once; cached locally after that).
-
-Input:  data/mahabharatam_clean.jsonl  (from clean_text.py)
-Output: data/mahabharatam_chunks.jsonl
-        {"chunk_id": 0, "chapter_num": 1, "chapter_title": "...",
-         "pages": [18, 19], "token_count": 487, "text": "..."}
-"""
-
 import json
 import re
 from pathlib import Path

@@ -1,28 +1,3 @@
-"""
-app.py
--------
-FastAPI backend — wires MahabharatamRetriever + generate_answer into
-HTTP endpoints consumed by the frontend (template/index.html).
-
-Now supports a chat-style interface with multiple conversations,
-follow-up questions that carry context from earlier turns, and
-persistence of all conversations to a local data.json file (no
-database required).
-
-Endpoints:
-  GET    /                          -> serves the HTML UI
-  GET    /health                    -> liveness check
-  GET    /conversations             -> list all conversations (summaries)
-  GET    /conversations/{id}        -> full conversation incl. messages
-  DELETE /conversations/{id}        -> delete a conversation
-  POST   /ask                       -> non-streaming: returns full answer as JSON
-  POST   /ask/stream                -> streaming SSE, tokens arrive word-by-word
-
-Run:
-  uvicorn app:app --reload --port 8000
-  Then open: http://localhost:8000 or http://127.0.0.1:8000
-"""
-
 import os
 import json
 import uuid

@@ -1,29 +1,30 @@
 # --- PDF handling + OCR (data_loader.py) ---
-pymupdf>=1.24.0
-pytesseract>=0.3.10
-pillow>=10.0.0
+pymupdf
+pytesseract
+pillow
 
 # --- Embeddings (embedding.py — BGE-M3) ---
-sentence-transformers>=2.7.0
+sentence-transformers
 
 # --- Tokenizer for chunk sizing (chunking.py — must match embedding model) ---
-transformers>=4.40.0
+transformers
 
 # --- Vector store (vector_store.py) ---
-chromadb>=0.5.0
+chromadb
 
 # --- LLM generation (translate_text.py / search.py — Groq) ---
-groq>=0.9.0
+groq
 
 # --- Web framework (app.py / main.py) ---
-fastapi>=0.110.0
-uvicorn[standard]>=0.29.0
+fastapi
+uvicorn[standard]
 
 # --- Config / env management ---
-python-dotenv>=1.0.0
+python-dotenv
 
 # --- Language detection (translate_text.py) ---
-langdetect>=1.0.9
+langdetect
 
-# --- Core utility ---
-numpy>=1.26.0
+# --- Hybrid search — BM25 keyword index (bm25_index.py + search.py) ---
+rank-bm25
+numpy

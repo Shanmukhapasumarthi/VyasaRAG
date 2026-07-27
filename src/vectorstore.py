@@ -1,29 +1,3 @@
-"""
-vector_store.py
-----------------
-Reads mahabharatam_embeddings.jsonl and upserts every chunk into a
-persistent local Chroma collection.
-
-Why Chroma (vs Pinecone / FAISS):
-- Fully local — no API key, no network, no cost
-- Persists to disk automatically (just point it at a folder)
-- Stores metadata alongside vectors natively, so we can filter by
-  chapter_num / chapter_title at query time without a separate DB
-- Easy to swap for Pinecone later if you ever need cloud-scale
-
-Collection design decisions:
-- One collection for the whole book ("mahabharatam")
-- chunk_id is the Chroma document ID → safe to rerun (upsert, not insert,
-  so duplicates are overwritten, not doubled)
-- Metadata stored per chunk: chapter_num, chapter_title, pages (as string),
-  token_count — available for filtered retrieval or citation in answers
-- Embeddings stored as-is (already L2-normalised from embedding.py),
-  so cosine similarity = dot product — fast and accurate
-
-Input:  data/mahabharatam_embeddings.jsonl  (from embedding.py)
-Output: data/chroma_db/  (persistent Chroma directory)
-"""
-
 import json
 from pathlib import Path
 
