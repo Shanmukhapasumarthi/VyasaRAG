@@ -127,11 +127,13 @@ USER QUESTION: {query}
 
 INSTRUCTIONS:
 1. Read and understand the Telugu passages above carefully.
-2. Answer the user's question based ONLY on the information in those passages.
-3. You MUST write your ENTIRE answer in {answer_lang}. Do NOT use any other language.
-4. If the passages do not contain enough information, say so clearly in {answer_lang}.
-5. Mention which chapter the information comes from when relevant.
-6. Keep the answer concise and accurate.
+2. Use ONLY the information contained in the retrieved passages.
+3. Answer or summarize the retrieved information according to the user's request.
+4. Write your ENTIRE answer in {answer_lang}.
+5. Do NOT add information that is not present in the retrieved passages.
+6. If the retrieved passages do not contain enough information, say so clearly in {answer_lang}.
+7. Mention the chapter when relevant.
+8. Keep the response concise and accurate.
 
 ANSWER (in {answer_lang} only):"""
 
