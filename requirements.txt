@@ -3,21 +3,23 @@ pymupdf
 pytesseract
 pillow
 
-# --- Embeddings (embedding.py — BGE-M3) ---
+# --- Embeddings (embedding.py — BGE-M3) & Reranker (search.py — CrossEncoder) ---
 sentence-transformers
 
 # --- Tokenizer for chunk sizing (chunking.py — must match embedding model) ---
 transformers
+protobuf==6.31.1
 
 # --- Vector store (vector_store.py) ---
 chromadb
 
-# --- LLM generation (translate_text.py / search.py — Groq) ---
+# --- LLM generation & Query Expansion (translate_text.py / search.py — Groq) ---
 groq
 
-# --- Web framework (app.py / main.py) ---
+# --- Web framework & Templates (app.py) ---
 fastapi
 uvicorn[standard]
+jinja2
 
 # --- Config / env management ---
 python-dotenv

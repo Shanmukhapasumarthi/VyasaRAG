@@ -1,123 +1,141 @@
-# మహాభారతం — Multilingual RAG
+# మహాభారతం — Multilingual RAG (VyasaRAG)
 
 Ask questions about the Telugu Mahabharata in **any language** — Telugu, English, Hindi, Tamil, or others — and get answers grounded in the original Telugu source text, streamed back in the language you asked in.
 
-Built as a final-year B.Tech capstone project in AI/ML engineering.
+Built as an advanced AI/ML Retrieval-Augmented Generation (RAG) system over the 434-page Telugu Mahabharata.
 
 ---
 
 ## Architecture
 
 ```
-User Query (any language)
-        ↓
-BGE-M3 Multilingual Embedding   ← no translation needed
-        ↓
-Chroma Cross-lingual Vector DB  ← Telugu chunks stored here
-        ↓
-Top-K Telugu chunks retrieved
-        ↓
-Groq Llama-3.1-70B              ← reads Telugu, answers in query language
-        ↓
-Final Answer (same language as query)
+                                  ┌──────────────────────────┐
+                                  │   User Query (Any Lang)  │
+                                  └────────────┬─────────────┘
+                                               │
+                                  ┌────────────▼─────────────┐
+                                  │ 3-Stage Language Detect  │
+                                  │ (Unicode/Intent/Lang)    │
+                                  └────────────┬─────────────┘
+                                               │
+                                  ┌────────────▼─────────────┐
+                                  │  MD5 Query-Level Cache   │
+                                  └─────┬──────────────┬─────┘
+                             Cache Hit  │              │ Cache Miss
+                                        │              │
+                   ┌────────────────────▼───┐      ┌───▼──────────────────────┐
+                   │ Return Cached Results  │      │ Query Expansion (Groq)   │
+                   └────────────────────────┘      └───────────┬──────────────┘
+                                                               │
+                                         ┌─────────────────────┴─────────────────────┐
+                                         │                                           │
+                            ┌────────────▼─────────────┐                ┌────────────▼─────────────┐
+                            │ Vector Search (BGE-M3)   │                │   BM25 Keyword Search    │
+                            │   Chroma DB Top-20       │                │      Pickle Top-20       │
+                            └────────────┬─────────────┘                └────────────┬─────────────┘
+                                         │                                           │
+                                         └─────────────────────┬─────────────────────┘
+                                                               │
+                                                  ┌────────────▼─────────────┐
+                                                  │ Reciprocal Rank Fusion   │
+                                                  │     (RRF Constant k=60)  │
+                                                  └────────────┬─────────────┘
+                                                               │
+                                                  ┌────────────▼─────────────┐
+                                                  │ Cross-Encoder Reranker   │
+                                                  │  (MiniLM-L-6-v2 Top-K)   │
+                                                  └────────────┬─────────────┘
+                                                               │
+                                                  ┌────────────▼─────────────┐
+                                                  │ Context Formatting & LLM │
+                                                  │ Answer Gen (Groq 120B)   │
+                                                  └──────────────────────────┘
 ```
-
-**Key design choice:** the query is encoded directly by BGE-M3 without translating it to Telugu first. Because BGE-M3 was trained on parallel multilingual data, a question in English and a Telugu passage about the same topic land close together in the 1024-dim vector space. This means no translation errors compound before retrieval.
 
 ---
 
-## Tech Stack
+## Tech Stack & Enhancements
 
-| Component | Choice | Why |
+| Component | Choice / Model | Description & Purpose |
 |---|---|---|
-| EASYOCR | Tesseract (`tel`) | Source PDF uses legacy non-Unicode Telugu fonts (Praveena/Priyaanka) — direct text extraction returns garbled output |
-| Embedding | `BAAI/bge-m3` | Best-in-class cross-lingual dense retrieval, 10+ languages, 8192 token context |
-| Vector DB | Chroma (local, persistent) | Zero infra, free, metadata filtering built-in |
-| Chunking | Recursive semantic, ~500 tokens / 50 overlap | Preserves sentence boundaries; overlap prevents ideas split across chunk edges from being lost |
-| LLM | Groq `openai/gpt-oss-120b` | Strong multilingual generation; 70B noticeably better than 8B for low-resource Telugu output |
-| Backend | FastAPI + SSE streaming | Tokens stream to the frontend word-by-word — no long waits |
-| Frontend | Vanilla JS + Jinja2 | No build step, no framework overhead |
+| **OCR Ingestion** | Tesseract (`tel`) / PyMuPDF | Extracts text from non-Unicode legacy Telugu PDF fonts into structured Unicode Telugu. |
+| **Dense Embedding** | `BAAI/bge-m3` | 1024-dim cross-lingual semantic embedding model with 8192 token context. |
+| **Lexical Search** | BM25 Okapi (`rank-bm25`) | Indic-aware regex tokenizer capturing keyword matches across names & places. |
+| **Hybrid Fusion** | Reciprocal Rank Fusion (RRF) | Fuses dense vector and sparse keyword rankings ($k=60$). |
+| **Cross-Encoder Reranker** | `cross-encoder/ms-marco-MiniLM-L-6-v2` | Re-scores top-20 hybrid candidate passages for deep semantic relevance. |
+| **Query Expansion** | Groq `llama-3.1-8b-instant` | Expands user questions into 3-5 alternative search terms prior to retrieval. |
+| **Query Cache** | In-Memory Session MD5 Cache | Instant responses for repeated queries; tracks hits, misses, and cache size. |
+| **LLM Generation** | Groq `openai/gpt-oss-120b` | Grounded multilingual generation from retrieved Telugu passages. |
+| **Backend API** | FastAPI + SSE Streaming | Streaming/JSON endpoints, Jinja2 template rendering, and `/health` metrics. |
 
 ---
 
 ## Project Structure
 
 ```
-mahabharatam-rag/
-├── .env.example            ← copy to .env, add your Groq API key
-├── requirements.txt
+VyasaRAG/
+├── app.py                      # FastAPI server (GET /, POST /ask, POST /ask/stream, GET /health)
+├── requirements.txt            # Package dependencies
+├── PROJECT_DOCUMENTATION.md    # In-depth architectural documentation
+├── README.md                   # Project overview (this file)
 │
-├── data_loader.py          ← OCR the PDF → data/mahabharatam_ocr.jsonl
-├── clean_text.py           ← strip footers, tag chapters → mahabharatam_clean.jsonl
-├── chunking.py             ← recursive semantic split → mahabharatam_chunks.jsonl
-├── embedding.py            ← BGE-M3 embed all chunks → mahabharatam_embeddings.jsonl
-├── vector_store.py         ← upsert into Chroma → data/chroma_db/
-├── search.py               ← runtime retrieval (MahabharatamRetriever)
-├── translate_text.py       ← Groq generation + language detection
-├── app.py                  ← FastAPI server (GET /, POST /ask, POST /ask/stream)
+├── src/                        # Source backend modules
+│   ├── search.py               # MahabharatamRetriever (Hybrid, Reranker, Expansion, Cache)
+│   ├── evaluate.py             # Benchmark script for 20 hand-written QA pairs
+│   ├── translate_text.py       # Language detection & Groq answer generation
+│   ├── bm25index.py            # BM25 index generator
+│   ├── vectorstore.py          # Chroma vector DB builder
+│   ├── embeddings.py           # BGE-M3 embedding generator
+│   ├── chunking.py             # Text chunking logic
+│   ├── cleantext.py            # Text cleaning & chapter tagging
+│   └── dataloader.py           # PDF loader & OCR pipeline
+│
+├── tests/                      # Automated test suite
+│   ├── test_search.py          # Unit tests for search, reranking, expansion, and cache
+│   └── test_evaluate.py        # Unit tests for evaluation benchmark structure
 │
 ├── data/
-│   └── document.pdf        ← place your Mahabharata PDF here
-├── templates/
-│   └── index.html
+│   ├── MAHABHARATAM.pdf        # Source Telugu PDF
+│   ├── chroma_db/              # Persistent Chroma vector store
+│   ├── bm25_index.pkl          # Serialized BM25 index
+│   └── eval_results.json       # Benchmark hit rate results JSON
+│
+├── template/
+│   └── index.html              # Web UI HTML template
 └── static/
-    └── style.css
+    └── style.css               # Web UI styles
 ```
 
 ---
 
-## Setup
+## Setup & Execution
 
-### Install Python dependencies
-
+### 1. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### API Key
-
-```bash
-cp .env.example .env
-# Edit .env and add your Groq API key
-# Get a free key at: https://console.groq.com
+### 2. Environment Setup
+Create a `.env` file in the project root:
+```env
+GROQ_API_KEY=your_groq_api_key_here
 ```
 
----
-
-## Running the Pipeline
-
-Run these **once** to build the vector database from the PDF:
-
+### 3. Run Unit Tests
 ```bash
-# Step 1 — OCR the full PDF (~20 min, checkpointed)
-python3 data_loader.py
-
-# Step 2 — Clean OCR artifacts, tag chapters (~5 sec)
-python3 clean_text.py
-
-# Step 3 — Recursive semantic chunking (~2 min)
-python3 chunking.py
-
-# Step 4 — Generate BGE-M3 embeddings (~1-2 hrs CPU / ~10 min GPU, checkpointed)
-python3 embedding.py
-
-# Step 5 — Load into Chroma (~1 min)
-python3 vector_store.py
+python -m unittest discover -s tests
 ```
 
-> **Note:** Steps 1 and 4 checkpoint progress to disk. If interrupted, just rerun the same command — already-processed pages/chunks are skipped automatically.
-
-After the pipeline completes, `data/chroma_db/` persists on disk. You never need to re-run these scripts unless you change the source PDF or chunking strategy.
-
----
-
-## Starting the Server
-
+### 4. Run Evaluation Benchmark
 ```bash
-uvicorn app:app --reload --port 8000
+python src/evaluate.py
 ```
 
-Open **http://localhost:8000** in your browser.
+### 5. Launch Application Server
+```bash
+python app.py
+```
+Open **http://localhost:8000** in your web browser.
 
 ---
 
@@ -125,71 +143,53 @@ Open **http://localhost:8000** in your browser.
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/` | Serves the web UI |
-| `POST` | `/ask` | Returns full answer + sources as JSON (non-streaming) |
-| `POST` | `/ask/stream` | Streams answer tokens via Server-Sent Events |
-| `GET` | `/health` | Returns server status and vector count |
+| `GET` | `/` | Renders the web interface |
+| `POST` | `/ask` | Returns answer JSON + retrieved sources |
+| `POST` | `/ask/stream` | Streams answer tokens via SSE |
+| `GET` | `/health` | Server status, vector count, and cache statistics (`cache_hits`, `cache_misses`, `cache_size`) |
 
-### Example: POST /ask
-
-```bash
-curl -X POST http://localhost:8000/ask \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Who is Bhishma and what vow did he take?"}'
-```
-
+### Example: GET /health Response
 ```json
 {
-  "query": "Who is Bhishma and what vow did he take?",
-  "detected_language": "English",
-  "answer": "Bhishma, originally named Devavrata, was the son of King Shantanu...",
-  "sources": [
-    {
-      "chunk_id": 9,
-      "chapter_title": "భిష్మ ప్రతిజ్ఞ",
-      "pages": [23, 24],
-      "score": 0.91,
-      "text": "..."
-    }
-  ]
+  "status": "ok",
+  "project": "VyasaRAG",
+  "retriever_loaded": true,
+  "vector_count": 375,
+  "conversations": 0,
+  "cache_hits": 5,
+  "cache_misses": 2,
+  "cache_size": 2
 }
 ```
 
 ---
 
-## How It Works — Step by Step
+## Evaluation Benchmark
 
-### Why EASYOCR instead of direct text extraction?
-The source PDF is typeset in **Praveena** and **Priyaanka** — legacy non-Unicode Telugu DTP fonts from Modular Infotech. These fonts map Telugu glyphs onto Latin/ASCII codepoints for visual rendering. Direct extraction (PyMuPDF, pdfplumber) returns the raw codepoints — readable-looking garbage, not Telugu Unicode. OCR reads the rendered glyphs as pixels, producing proper Unicode Telugu regardless of the font encoding.
+Systematic Top-5 Hit Rate evaluation over **20 hand-written multilingual QA pairs** (7 Telugu, 7 English, 6 Hindi):
 
-### Why no translation step?
-A common "multilingual RAG" approach translates the query to English, retrieves English chunks, then translates the answer back. This compounds translation errors twice and ignores the source language entirely. BGE-M3 was trained on parallel multilingual corpora — it encodes meaning, not just language-specific tokens. A Telugu passage and an English question about the same event naturally cluster together in the embedding space without any translation hop.
+| Mode | Top-5 Hit Rate | Details |
+|---|---|---|
+| **Semantic-Only** | **55.0%** (11/20) | BGE-M3 vector search |
+| **BM25-Only** | **15.0%** (3/20) | BM25 sparse keyword search |
+| **Hybrid (BGE-M3 + BM25)** | **45.0%** (9/20) | Reciprocal Rank Fusion |
+| **Hybrid + Cross-Encoder Reranker** | **30.0%** (6/20) | Hybrid candidates re-scored via MiniLM-L-6-v2 |
 
-### Why 70B over 8B for generation?
-Telugu is low-resource in most open LLMs' training data. The quality gap between 70B and 8B is most visible in the *generation* step — when the model needs to read Telugu context and produce fluent Telugu (or another language) output. 8B often produces stilted or grammatically inconsistent Telugu output. 70B handles this meaningfully better.
-
----
-
-## Known Limitations
-
-- **EasyOCR** grabs words from images, but it doesn't understand the meaning of the document. It treats a page like a flat picture, not a smart form.
-- **Front matter exclusion:** Pages 0–17 (title, TOC, translator's foreword) are excluded from the index. Verify `CONTENT_START_PAGE = 18` in `clean_text.py` matches your specific edition.
-- **Telugu generation quality:** Llama-3.1-70B handles Telugu well but is not a native-Telugu model. Answers in Telugu are fluent for most questions but may have minor grammatical imperfections.
-- **CPU embedding time:** Generating BGE-M3 embeddings for ~2000 chunks takes 1-2 hours on CPU. Consider using a machine with a GPU for the embedding step.
+Results are exported to [`data/eval_results.json`](file:///c:/Users/P.V.H.Shanmukha/OneDrive/Documents/VyasaRAG/data/eval_results.json).
 
 ---
 
-## Future Improvements
+## Key Technical Decisions
 
-- [ ] Cross-encoder reranker on top-k results before LLM context (improves precision)
-- [ ] Chapter number correction lookup table (title → correct number)
-- [ ] Streaming to mobile-friendly UI
-- [ ] Evaluation set: 20–30 hand-written Telugu QA pairs for systematic quality measurement
+1. **OCR over Direct PDF Extraction**: Source PDF uses legacy non-Unicode Telugu fonts (`Praveena`/`Priyaanka`). Direct text extraction yields corrupted codepoints; OCR extracts proper Unicode Telugu.
+2. **Direct Cross-Lingual Search**: BGE-M3 eliminates query translation pre-steps, avoiding compounding translation errors before retrieval.
+3. **Cross-Encoder Reranking**: Re-evaluates top candidate passages against the exact query string to filter out false positives.
+4. **Session MD5 Caching**: Avoids redundant LLM & vector operations for duplicate user requests during a session.
 
 ---
 
 ## Author
 
-**Shanmukha Pasumarthi**
-B.Tech (AI/ML), VIT-AP University
+**Shanmukha Pasumarthi**  
+B.Tech (AI/ML), VIT-AP University  
 [github.com/Shanmukhapasumarthi](https://github.com/Shanmukhapasumarthi)

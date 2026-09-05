@@ -1,4 +1,7 @@
 import os
+os.environ["USE_TF"] = "0"
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+
 import json
 import uuid
 import threading
@@ -401,12 +404,16 @@ async def ask_stream(req: AskRequest):
 @app.get("/health")
 async def health():
     """Liveness check — visit http://localhost:8000/health to confirm server is up."""
+    cache_stats = retriever.get_cache_stats() if retriever else {"cache_hits": 0, "cache_misses": 0, "cache_size": 0}
     return {
         "status":           "ok",
         "project":          "VyasaRAG",
         "retriever_loaded": retriever is not None,
         "vector_count":     retriever.collection.count() if retriever else 0,
         "conversations":    len(load_data()["conversations"]),
+        "cache_hits":       cache_stats["cache_hits"],
+        "cache_misses":     cache_stats["cache_misses"],
+        "cache_size":       cache_stats["cache_size"],
     }
 
 
